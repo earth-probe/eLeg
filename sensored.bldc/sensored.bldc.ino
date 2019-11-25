@@ -1,4 +1,3 @@
-#include <TimerOne.h>
 #define DUMP_VAR(x)  { \
   Serial.print(__LINE__);\
   Serial.print("@@"#x"=<");\
@@ -33,9 +32,11 @@ void setup() {
 }
 
 static int32_t iMainLoopCounter = 0;
+
 const static int32_t iMainLoopPrintA = 1024;
 const static int32_t iMainLoopPrintB = 16;
 const static int32_t iMainLoopPrintSkip = iMainLoopPrintA*iMainLoopPrintB;
+
 void loop() {
   auto diff = iMainLoopCounter - iMainLoopPrintSkip;
   //DUMP_VAR(diff);
