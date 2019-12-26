@@ -37,6 +37,8 @@ const static int32_t iMainLoopPrintA = 1024;
 const static int32_t iMainLoopPrintB = 16;
 const static int32_t iMainLoopPrintSkip = iMainLoopPrintA*iMainLoopPrintB;
 
+static long iHallTurnRunStep = 0;
+
 void loop() {
   auto diff = iMainLoopCounter - iMainLoopPrintSkip;
   //DUMP_VAR(diff);
@@ -66,6 +68,10 @@ void loop() {
       analogWrite(PORT_PWM, 0);
       digitalWrite(PORT_BRAKE,LOW);
     }
+    if(incomingByte == 'g') {
+      startMotor();
+    }
+    /*
     if(incomingByte == '1') {
       analogWrite(PORT_PWM, 16);
     }
@@ -81,10 +87,31 @@ void loop() {
     if(incomingByte == '5') {
       analogWrite(PORT_PWM, 255);
     }
+    */
   }
-
 }
 
 void HallTurnCounterInterrupt(void) {
   iHallTurnCounter++;
+  if(iHallTurnRunStep > 0) {
+    iHallTurnRunStep--;
+  } else {
+    stopMotor();
+  }
 }
+
+void stopMotor(void) {
+  analogWrite(PORT_PWM, 0);
+  digitalWrite(PORT_BRAKE,LOW);
+  iHallTurnRunStep = -1;
+}
+void startMotor(void) {
+  analogWrite(PORT_PWM, 32);
+  digitalWrite(PORT_BRAKE,HIGH);
+  iHallTurnRunStep = 6;
+}
+
+/*
+void verifyRunTime(void) {
+}
+*/
