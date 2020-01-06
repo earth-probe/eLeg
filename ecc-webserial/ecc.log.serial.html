@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+  </head>
+   <body>
+    <div class="container-fluid mt-2">
+      <h3>Web Serial API設定する</h3>
+      <h5 class="badge badge-warning">chrome://flags/#enable-experimental-web-platform-features</h5>
+    </div>
+    <div class="container-fluid">
+      <div class="row mt-2">
+        <div class="col d-flex justify-content-start">
+          <input type="button" onClick="onClickListDevice(this)" value="LIST Key Device"></input>
+        </div>
+      </div>
+      <div class="row mt-1">
+        <div class="col-12 d-flex justify-content-center">
+          <pre class="w-100 border border-primary bg-dark text-white" id="serail-output" style="height: 420px;">
+          </pre>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/8.0.12/jsrsasign-all-min.js" integrity="sha256-EI1piDYqyKFAy+ykWQZRjH5kkw9eIYE/IahQWg1rXt0=" crossorigin="anonymous"></script>
+    <script src="./ecc.device.js"></script>
+  </body>
+</html>
+
