@@ -11,6 +11,10 @@
 #define PORT_PWM 3
 #define PORT_HALL 2
 
+#define PORT_LIMIT_Z 7
+#define PORT_LIMIT_F 8
+
+
 static long iHallTurnCounter = 0;
 
 void setup() {
@@ -19,6 +23,8 @@ void setup() {
   pinMode(PORT_CW, OUTPUT);
   pinMode(PORT_PWM, OUTPUT);
   pinMode(PORT_HALL, INPUT_PULLUP);
+  pinMode(PORT_LIMIT_Z, INPUT_PULLUP);
+  pinMode(PORT_LIMIT_F, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PORT_HALL),HallTurnCounterInterrupt , FALLING);
 
   // clock prescale by 1, PWM frequency: 32KHz
@@ -40,6 +46,31 @@ const static int32_t iMainLoopPrintSkip = iMainLoopPrintA*iMainLoopPrintB;
 static long iHallTurnRunStep = 0;
 
 void loop() {
+  verifyLimitSwitch();
+  //printTurnCounter();
+  handleIncommingCommand();
+}
+
+
+void HallTurnCounterInterrupt(void) {
+  iHallTurnCounter++;
+  DUMP_VAR(iHallTurnCounter);
+  if(iHallTurnRunStep > 0) {
+    iHallTurnRunStep--;
+  } else {
+    stopMotor();
+  }
+}
+
+void verifyLimitSwitch(void) {
+  int z = digitalRead(PORT_LIMIT_Z);
+  DUMP_VAR(z);
+  int f = digitalRead(PORT_LIMIT_F);
+  DUMP_VAR(f);  
+}
+
+
+void printTurnCounter(void) {
   auto diff = iMainLoopCounter - iMainLoopPrintSkip;
   //DUMP_VAR(diff);
   //DUMP_VAR(iMainLoopPrintSkip);
@@ -50,6 +81,9 @@ void loop() {
   }
   iMainLoopCounter++;
   //DUMP_VAR(iMainLoopCounter);
+}
+
+void handleIncommingCommand(void) {
   if (Serial.available() > 0) {
     char incomingByte = Serial.read();
     if(incomingByte == 'z') {
@@ -91,14 +125,6 @@ void loop() {
   }
 }
 
-void HallTurnCounterInterrupt(void) {
-  iHallTurnCounter++;
-  if(iHallTurnRunStep > 0) {
-    iHallTurnRunStep--;
-  } else {
-    stopMotor();
-  }
-}
 
 void stopMotor(void) {
   analogWrite(PORT_PWM, 0);
