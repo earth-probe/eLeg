@@ -32,7 +32,7 @@ void setup() {
   TCCR2B = TCCR2B & 0xF8 | 0x01;
  
   Serial.begin(115200);
-  Serial.print("goto start!!!\n");
+  DUMP_VAR("goto start!!!\n");
   digitalWrite(PORT_BRAKE,LOW);
   digitalWrite(PORT_CW,HIGH);
   analogWrite(PORT_PWM, 0);
@@ -46,7 +46,12 @@ const static int32_t iMainLoopPrintSkip = iMainLoopPrintA*iMainLoopPrintB;
 
 static long volatile iHallTurnRunStep = 0;
 static bool iBoolMotorCWFlag = false; //
-static uint16_t volatile iPositionByHallCounter= 0;
+static const  int16_t iPositionByHallRangeLow = 50;
+static const  int16_t iPositionByHallRangeDistance = 163;
+static const  int16_t iPositionByHallRangeHigh = iPositionByHallRangeLow + iPositionByHallRangeDistance;
+static int16_t volatile iPositionByHallCounter= -1;
+
+static bool iBoolRunCalibrate = false; //
 
 void loop() {
   verifyLimitSwitch();
@@ -57,7 +62,7 @@ void loop() {
 
 void HallTurnCounterInterrupt(void) {
   iHallTurnCounter++;
-  DUMP_VAR(iHallTurnCounter);
+  //DUMP_VAR(iHallTurnCounter);
   if(iHallTurnRunStep > 0) {
     iHallTurnRunStep--;
   } else {
@@ -76,16 +81,28 @@ void verifyLimitSwitch(void) {
   if(z == 0) {
     //DUMP_VAR(z);
     if(iBoolMotorCWFlag == true) {
-      iPositionByHallCounter= 163;
+      iPositionByHallCounter= iPositionByHallRangeHigh;
       stopMotor();
+    }
+    if(iBoolRunCalibrate) {
+      DUMP_VAR(iPositionByHallCounter);
+      DUMP_VAR(iPositionByHallRangeLow);
+      DUMP_VAR(iPositionByHallRangeHigh);
+      iBoolRunCalibrate = false;
     }
   }
   int f = digitalRead(PORT_LIMIT_F);
   if(f == 0) {
     //DUMP_VAR(f);
     if(iBoolMotorCWFlag == false) {
-      iPositionByHallCounter= 0;
+      iPositionByHallCounter= iPositionByHallRangeLow;
       stopMotor();
+    }
+    if(iBoolRunCalibrate) {
+      DUMP_VAR(iPositionByHallCounter);
+      DUMP_VAR(iPositionByHallRangeLow);
+      DUMP_VAR(iPositionByHallRangeHigh);
+      iBoolRunCalibrate = false;
     }
   }
 }
@@ -104,16 +121,27 @@ void printTurnCounter(void) {
   //DUMP_VAR(iMainLoopCounter);
 }
 
+#define CW() {\
+  iBoolMotorCWFlag = true;\
+  digitalWrite(PORT_CW,HIGH);\
+}
+
+#define CCW() {\
+  iBoolMotorCWFlag = false;\
+  digitalWrite(PORT_CW,LOW);\
+  }
+
+void runLongCommand(char ch);
+
 void handleIncommingCommand(void) {
   if (Serial.available() > 0) {
     char incomingByte = Serial.read();
     if(incomingByte == 'z') {
-      iBoolMotorCWFlag = true;
+      CW();
       digitalWrite(PORT_CW,HIGH);
     }
     if(incomingByte == 'f') {
-      iBoolMotorCWFlag = false;
-      digitalWrite(PORT_CW,LOW);
+      CCW();
     }
     if(incomingByte == 'b') {
       digitalWrite(PORT_BRAKE,HIGH);
@@ -128,6 +156,8 @@ void handleIncommingCommand(void) {
     if(incomingByte == 'g') {
       startMotor();
     }
+    runLongCommand(incomingByte);
+    
     /*
     if(incomingByte == '1') {
       analogWrite(PORT_PWM, 16);
@@ -148,6 +178,50 @@ void handleIncommingCommand(void) {
   }
 }
 
+static String gHandleStringCommand;
+void runLongCommand(char ch) {
+  gHandleStringCommand += ch;
+  if(ch == '\n') {
+    DUMP_VAR(gHandleStringCommand);
+    if(gHandleStringCommand.startsWith("calibrate")) {
+      runCalibrate();
+    }
+    if(gHandleStringCommand.startsWith("pos:")) {
+      auto posValue = gHandleStringCommand.substring(4, gHandleStringCommand.length());
+      posValue.trim();
+      DUMP_VAR(posValue);
+      auto pos = posValue.toInt();
+      runToPosion(pos);
+    }
+    gHandleStringCommand = "";
+  }
+}
+
+void runCalibrate(void) {
+  iBoolMotorCWFlag = false;
+  digitalWrite(PORT_CW,LOW);
+  iBoolRunCalibrate = true;
+  startMotor();
+}
+
+void runToPosion(int16_t position) {
+  DUMP_VAR(position);
+  int16_t currentPos = iPositionByHallCounter;
+  DUMP_VAR(currentPos);
+  int16_t diff = position - currentPos;
+  DUMP_VAR(diff);
+  iHallTurnRunStep = abs(diff);
+  DUMP_VAR(iHallTurnRunStep);
+  if(iHallTurnRunStep > 0) {
+    if(diff > 0) {
+      CW();
+    } else {
+      CCW();
+    }
+    analogWrite(PORT_PWM, 64);
+    digitalWrite(PORT_BRAKE,HIGH);
+  }
+}
 
 void stopMotor(void) {
   analogWrite(PORT_PWM, 0);

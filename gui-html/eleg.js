@@ -32,6 +32,7 @@ const onClickOpenDevice = async (evt) => {
 }
 
 let readBuffOneLine = '';
+let readLineBufferSlice = [];
 let readLineBuffer = [];
 const elemRead = document.getElementById('serail-output');
 const readSerailData = (reader)=> {
@@ -40,17 +41,25 @@ const readSerailData = (reader)=> {
     //console.log('readSerailData::readOne evt=<',evt,'>');
     //console.log('readSerailData::readOne evt.value=<',evt.value.buffer,'>');
     const utf8txt = new TextDecoder("utf-8").decode(evt.value);
-    //console.log('readSerailData::readOne utf8txt=<',utf8txt,'>');
-    readBuffOneLine += utf8txt;
+    //console.log('readSerailData::readOne utf8txt=<',utf8txt,'>');    
     const hint = utf8txt.indexOf('&$');
-    if(hint) {
-      //console.log('readSerailData::readOne readBuffOneLine=<',readBuffOneLine,'>');
-      readLineBuffer.push(readBuffOneLine);            
+    const utf8Param = utf8txt.split('&$');
+    //console.log('readSerailData::readOne utf8Param=<',utf8Param,'>');
+    if(utf8Param.length > 1) {
+      readLineBufferSlice.push(utf8Param[0]);
+      const oneLineBuf = readLineBufferSlice.join('');
+      //console.log('readSerailData::readOne oneLineBuf=<',oneLineBuf,'>');
+      onELegInfoLine(oneLineBuf);
+      readLineBuffer.push(oneLineBuf);            
       if(readLineBuffer.length > 20) {
         readLineBuffer.shift();
-      }            
+      }
+      readLineBufferSlice = [];
+      readLineBufferSlice.push(utf8Param[1]);
       elemRead.textContent = readLineBuffer.join('');
       readBuffOneLine = '';
+    } else {
+      readLineBufferSlice.push(utf8Param[0]);
     }
     if(evt.done === false) {
       setTimeout(()=>{
@@ -60,6 +69,51 @@ const readSerailData = (reader)=> {
   });          
 };
 
+const ElegPosCounterStarter = 'iPositionByHallCounter=<';
+const ElegPosLowStarter = 'iPositionByHallRangeLow=<';
+const ElegPosHightStarter = 'iPositionByHallRangeHigh=<';
+
+const onELegInfoLine = (lineCmd) => {
+  console.log('onELegInfoLine::lineCmd=<',lineCmd,'>');
+  if( lineCmd.indexOf(ElegPosCounterStarter) >= 0) {
+    const currentPos = getValueOfLineCmd(lineCmd);
+    console.log('onELegInfoLine::currentPos=<',currentPos,'>');
+    updateRangevalue(currentPos);
+  }
+  if(lineCmd.indexOf(ElegPosLowStarter) >= 0) {
+    const lowPos = getValueOfLineCmd(lineCmd);
+    console.log('onELegInfoLine::lowPos=<',lowPos,'>');
+    changeLowOfPos(lowPos);
+  }
+  if(lineCmd.indexOf(ElegPosHightStarter) >= 0) {
+    const hightPos = getValueOfLineCmd(lineCmd);
+    console.log('onELegInfoLine::hightPos=<',hightPos,'>');
+    changeHighOfPos(hightPos);
+  }
+}
+
+const getValueOfLineCmd =(lineCmd) => {
+  const start = lineCmd.indexOf('=<');
+  const end = lineCmd.indexOf('>');
+  const value = lineCmd.slice(start+2,end);
+  console.log('onELegInfoLine::value=<',value,'>');
+  return parseInt(value);
+}
+
+const changeLowOfPos = (value) => {
+  const minElem = document.getElementById('eleg-position-min');
+  minElem.textContent = value;
+  const rangeElem = document.getElementById('eleg-position-value-range');
+  rangeElem.setAttribute('min',value);
+}
+
+
+const changeHighOfPos = (value) => {
+  const maxElem = document.getElementById('eleg-position-max');
+  maxElem.textContent = value;
+  const rangeElem = document.getElementById('eleg-position-value-range');
+  rangeElem.setAttribute('max',value);
+}
 
 const onClickCalibratePosition = (evt) => {
   try {
@@ -76,12 +130,12 @@ const onClickCalibratePosition = (evt) => {
 }
 
 
-const onClickChangePosition = (elem) => {
+const onChangePosition = (elem) => {
   try {
     changeRangevalue(elem.value);
     if(gElegWriter) {
       console.log('onClickChangePosition::elem.value=<',elem.value,'>');
-      const reqPosition = `pos:#{elem.value}\n`;
+      const reqPosition = `pos:${elem.value}\n`;
       const wBuff = new TextEncoder().encode(reqPosition);
       console.log('onClickChangePosition::wBuff=<',wBuff,'>');
       gElegWriter.write(wBuff);
@@ -93,56 +147,17 @@ const onClickChangePosition = (elem) => {
 }
 
 const changeRangevalue = (value) => {
-  console.log('changeRangevalue::value=<',value,'>');
-  const valueElem = document.getElementById('eleg-position-value');
-  valueElem.textContent = value;
+  const targetElem = document.getElementById('eleg-position-value-target-label');
+  targetElem.textContent = value;
+  updateRangevalue(value);
 }
 
-/*
-const onClickOpenEccKeyDevice = async (evt) => {
-  try {
-    const device = await navigator.serial.requestPort({filters: filters});
-    console.log('onClickOpenEccKeyDevice::device=<',device,'>');
-    await device.open(serialOption);
-    console.log('onClickOpenEccKeyDevice::device=<',device,'>');
-    const reader = device.readable.getReader();
-    console.log('onClickOpenEccKeyDevice::reader=<',reader,'>');
-    setTimeout(()=> {
-      readEccDeviceData(reader);
-    },0);
-    gEccDeviceWriter = device.writable.getWriter();;
-    console.log('onClickOpenEccKeyDevice::gEccDeviceWriter=<',gEccDeviceWriter,'>');
-  }
-  catch(e) {
-    console.log('onClickOpenEccKeyDevice::e=<',e,'>');
-  }
+const updateRangevalue = (value) => {
+  console.log('updateRangevalue::value=<',value,'>');
+  const labelElem = document.getElementById('eleg-position-value-label');
+  labelElem.textContent = value;
+ 
+ console.log('updateRangevalue::value=<',value,'>');
+  const rangeElem = document.getElementById('eleg-position-value-range');
+  rangeElem.value = value;
 }
-
-
-const elemReadEcc = document.getElementById('serail-output');
-const readEccDeviceData = (reader)=> {
-  const readOne = reader.read();
-  readOne.then((evt)=>{
-    //console.log('readEccDeviceData::readOne evt=<',evt,'>');
-    //console.log('readEccDeviceData::readOne evt.value=<',evt.value.buffer,'>');
-    const utf8txt = new TextDecoder('utf-8').decode(evt.value);
-    //console.log('readEccDeviceData::readOne utf8txt=<',utf8txt,'>');
-    elemReadEcc.textContent += utf8txt;
-    if(evt.done === false) {
-      setTimeout(()=>{
-        readEccDeviceData(reader);
-      },0)
-    }
-  });          
-};
-
-let gEccDeviceWriter = false;
-const onClickReadPublicKey = ()=> {
-  if(gEccDeviceWriter) {
-    const reqPubKey = {f:'pub'};
-    const wBuff = new TextEncoder().encode(JSON.stringify(reqPubKey));
-    console.log('onClickReadPublicKey::wBuff=<',wBuff,'>');
-    gEccDeviceWriter.write(wBuff);
-  }
-}
-*/
