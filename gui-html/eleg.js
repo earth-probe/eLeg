@@ -41,25 +41,26 @@ const readSerailData = (reader)=> {
     //console.log('readSerailData::readOne evt=<',evt,'>');
     //console.log('readSerailData::readOne evt.value=<',evt.value.buffer,'>');
     const utf8txt = new TextDecoder("utf-8").decode(evt.value);
-    //console.log('readSerailData::readOne utf8txt=<',utf8txt,'>');    
-    const hint = utf8txt.indexOf('&$');
-    const utf8Param = utf8txt.split('&$');
-    //console.log('readSerailData::readOne utf8Param=<',utf8Param,'>');
-    if(utf8Param.length > 1) {
-      readLineBufferSlice.push(utf8Param[0]);
-      const oneLineBuf = readLineBufferSlice.join('');
-      //console.log('readSerailData::readOne oneLineBuf=<',oneLineBuf,'>');
-      onELegInfoLine(oneLineBuf);
-      readLineBuffer.push(oneLineBuf);            
+    //console.log('readSerailData::readOne utf8txt=<',utf8txt,'>');
+    readBuffOneLine += utf8txt;
+    const buffParam = readBuffOneLine.split('\n');
+    //console.log('readSerailData::readOne buffParam=<',buffParam,'>');
+    if(buffParam.length > 1) {
+      for(const lineCmd of buffParam) {
+        //console.log('readSerailData::readOne lineCmd=<',lineCmd,'>');
+        if(lineCmd) {
+          readLineBuffer.push(lineCmd);
+          onELegInfoLine(lineCmd);
+        }
+      }
       if(readLineBuffer.length > 20) {
         readLineBuffer.shift();
       }
-      readLineBufferSlice = [];
-      readLineBufferSlice.push(utf8Param[1]);
-      elemRead.textContent = readLineBuffer.join('');
-      readBuffOneLine = '';
-    } else {
-      readLineBufferSlice.push(utf8Param[0]);
+      elemRead.textContent = readLineBuffer.join('\n');
+
+      const lastElem = buffParam[buffParam.length -1];
+      //console.log('readSerailData::readOne lastElem=<',lastElem,'>');
+      readBuffOneLine = lastElem;
     }
     if(evt.done === false) {
       setTimeout(()=>{
@@ -69,15 +70,16 @@ const readSerailData = (reader)=> {
   });          
 };
 
-const ElegPosCounterStarter = 'iPositionByHallCounter=<';
+const ElegPosCounterStarter = 'iPositionByHall=<';
 const ElegPosLowStarter = 'iPositionByHallRangeLow=<';
-const ElegPosHightStarter = 'iPositionByHallRangeHigh=<';
+const ElegPosHighStarter = 'iPositionByHallRangeHigh=<';
+const ElegSpeedStarter = 'iConstCurrentSpeed=<';
 
 const onELegInfoLine = (lineCmd) => {
-  console.log('onELegInfoLine::lineCmd=<',lineCmd,'>');
+  //console.log('onELegInfoLine::lineCmd=<',lineCmd,'>');
   if( lineCmd.indexOf(ElegPosCounterStarter) >= 0) {
     const currentPos = getValueOfLineCmd(lineCmd);
-    console.log('onELegInfoLine::currentPos=<',currentPos,'>');
+    //console.log('onELegInfoLine::currentPos=<',currentPos,'>');
     updateRangevalue(currentPos);
   }
   if(lineCmd.indexOf(ElegPosLowStarter) >= 0) {
@@ -85,19 +87,26 @@ const onELegInfoLine = (lineCmd) => {
     console.log('onELegInfoLine::lowPos=<',lowPos,'>');
     changeLowOfPos(lowPos);
   }
-  if(lineCmd.indexOf(ElegPosHightStarter) >= 0) {
+  if(lineCmd.indexOf(ElegPosHighStarter) >= 0) {
     const hightPos = getValueOfLineCmd(lineCmd);
     console.log('onELegInfoLine::hightPos=<',hightPos,'>');
     changeHighOfPos(hightPos);
+  }
+  if(lineCmd.indexOf(ElegSpeedStarter) >= 0) {
+    const speed = getValueOfLineCmd(lineCmd);
+    console.log('onELegInfoLine::speed=<',speed,'>');
   }
 }
 
 const getValueOfLineCmd =(lineCmd) => {
   const start = lineCmd.indexOf('=<');
   const end = lineCmd.indexOf('>');
-  const value = lineCmd.slice(start+2,end);
-  console.log('onELegInfoLine::value=<',value,'>');
-  return parseInt(value);
+  if(start > -1 && end > -1) {
+    const value = lineCmd.slice(start+2,end);
+    //console.log('onELegInfoLine::value=<',value,'>');
+    return parseInt(value);
+  }
+  return false;
 }
 
 const changeLowOfPos = (value) => {
@@ -129,15 +138,59 @@ const onClickCalibratePosition = (evt) => {
   }
 }
 
+const onClickTurnZ = (evt) => {
+  try {
+  if(gElegWriter) {
+    const reqcalibrate = 'z\n';
+    const wBuff = new TextEncoder().encode(reqcalibrate);
+    console.log('onClickTurnZ::wBuff=<',wBuff,'>');
+    gElegWriter.write(wBuff);
+  }
+  }
+  catch(e) {
+    console.log('onClickTurnZ::e=<',e,'>');
+  }
+}
+
+const onClickTurnF = (evt) => {
+  try {
+  if(gElegWriter) {
+    const reqcalibrate = 'f\n';
+    const wBuff = new TextEncoder().encode(reqcalibrate);
+    console.log('onClickTurnF::wBuff=<',wBuff,'>');
+    gElegWriter.write(wBuff);
+  }
+  }
+  catch(e) {
+    console.log('onClickTurnF::e=<',e,'>');
+  }
+}
+
+const onClickTurnG = (evt) => {
+  try {
+  if(gElegWriter) {
+    const reqcalibrate = 'g\n';
+    const wBuff = new TextEncoder().encode(reqcalibrate);
+    console.log('onClickTurnG::wBuff=<',wBuff,'>');
+    gElegWriter.write(wBuff);
+  }
+  }
+  catch(e) {
+    console.log('onClickTurnG::e=<',e,'>');
+  }
+}
+
+
+
 
 const onChangePosition = (elem) => {
   try {
     changeRangevalue(elem.value);
     if(gElegWriter) {
-      console.log('onClickChangePosition::elem.value=<',elem.value,'>');
+      //console.log('onClickChangePosition::elem.value=<',elem.value,'>');
       const reqPosition = `pos:${elem.value}\n`;
       const wBuff = new TextEncoder().encode(reqPosition);
-      console.log('onClickChangePosition::wBuff=<',wBuff,'>');
+      //console.log('onClickChangePosition::wBuff=<',wBuff,'>');
       gElegWriter.write(wBuff);
     }
   }
@@ -153,11 +206,11 @@ const changeRangevalue = (value) => {
 }
 
 const updateRangevalue = (value) => {
-  console.log('updateRangevalue::value=<',value,'>');
+  //console.log('updateRangevalue::value=<',value,'>');
   const labelElem = document.getElementById('eleg-position-value-label');
   labelElem.textContent = value;
  
- console.log('updateRangevalue::value=<',value,'>');
+ //console.log('updateRangevalue::value=<',value,'>');
   const rangeElem = document.getElementById('eleg-position-value-range');
   rangeElem.value = value;
 }

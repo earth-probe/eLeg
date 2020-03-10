@@ -2,8 +2,8 @@
   Serial.print(__LINE__);\
   Serial.print("@@"#x"=<");\
   Serial.print(x);\
-  Serial.print(">&$");\
-  Serial.print("\r\n");\
+  Serial.print(">");\
+  Serial.print("\n");\
 }
 
 #define PORT_BRAKE 11
@@ -13,6 +13,17 @@
 
 #define PORT_LIMIT_Z 8
 #define PORT_LIMIT_F 7
+
+
+#define CW() {\
+  iBoolMotorCWFlag = true;\
+  digitalWrite(PORT_CW,HIGH);\
+}
+
+#define CCW() {\
+  iBoolMotorCWFlag = false;\
+  digitalWrite(PORT_CW,LOW);\
+  }
 
 
 static long iHallTurnCounter = 0;
@@ -49,16 +60,27 @@ static bool iBoolMotorCWFlag = false; //
 static const  int16_t iPositionByHallRangeLow = 50;
 static const  int16_t iPositionByHallRangeDistance = 163;
 static const  int16_t iPositionByHallRangeHigh = iPositionByHallRangeLow + iPositionByHallRangeDistance;
-static int16_t volatile iPositionByHallCounter= -1;
+static int16_t volatile iPositionByHall= -1;
+static uint8_t volatile iConstCurrentSpeed = 0;
 
 static bool iBoolRunCalibrate = false; //
 
+//const static uint8_t iConstMaxSpeed = 255;
+const static uint8_t iConstMaxSpeed = 64;
+const static uint8_t iConstMinSpeed = 16;
+
+
+
+static int16_t volatile iTargetPositionByHall= -1;
+void caclTargetSpeed(void);
+
 void loop() {
-  verifyLimitSwitch();
-  //printTurnCounter();
+  if(verifyLimitSwitch()){
+    caclTargetSpeed();
+  }
+ //printTurnCounter();
   handleIncommingCommand();
 }
-
 
 void HallTurnCounterInterrupt(void) {
   iHallTurnCounter++;
@@ -69,67 +91,52 @@ void HallTurnCounterInterrupt(void) {
     stopMotor();
   }
   if(iBoolMotorCWFlag) {
-    iPositionByHallCounter++;
+    iPositionByHall++;
   } else {
-    iPositionByHallCounter--;
+    iPositionByHall--;
   }
-  DUMP_VAR(iPositionByHallCounter);
+  DUMP_VAR(iPositionByHall);
+  DUMP_VAR(iConstCurrentSpeed);
+  DUMP_VAR(iTargetPositionByHall);
 }
 
-void verifyLimitSwitch(void) {
+bool verifyLimitSwitch(void) {
   int z = digitalRead(PORT_LIMIT_Z);
   if(z == 0) {
     //DUMP_VAR(z);
     if(iBoolMotorCWFlag == true) {
-      iPositionByHallCounter= iPositionByHallRangeHigh;
+      iPositionByHall= iPositionByHallRangeHigh;
       stopMotor();
     }
     if(iBoolRunCalibrate) {
-      DUMP_VAR(iPositionByHallCounter);
+      DUMP_VAR(iPositionByHall);
       DUMP_VAR(iPositionByHallRangeLow);
       DUMP_VAR(iPositionByHallRangeHigh);
       iBoolRunCalibrate = false;
     }
+    return false;
   }
   int f = digitalRead(PORT_LIMIT_F);
   if(f == 0) {
     //DUMP_VAR(f);
     if(iBoolMotorCWFlag == false) {
-      iPositionByHallCounter= iPositionByHallRangeLow;
+      iPositionByHall= iPositionByHallRangeLow;
       stopMotor();
     }
     if(iBoolRunCalibrate) {
-      DUMP_VAR(iPositionByHallCounter);
+      DUMP_VAR(iPositionByHall);
       DUMP_VAR(iPositionByHallRangeLow);
       DUMP_VAR(iPositionByHallRangeHigh);
       iBoolRunCalibrate = false;
     }
+    return false;
   }
+  return true;
 }
 
 
-void printTurnCounter(void) {
-  auto diff = iMainLoopCounter - iMainLoopPrintSkip;
-  //DUMP_VAR(diff);
-  //DUMP_VAR(iMainLoopPrintSkip);
-  if(  diff > 0 ) {
-    DUMP_VAR(iHallTurnCounter);
-    iMainLoopCounter = 0;
-  } else {
-  }
-  iMainLoopCounter++;
-  //DUMP_VAR(iMainLoopCounter);
-}
 
-#define CW() {\
-  iBoolMotorCWFlag = true;\
-  digitalWrite(PORT_CW,HIGH);\
-}
 
-#define CCW() {\
-  iBoolMotorCWFlag = false;\
-  digitalWrite(PORT_CW,LOW);\
-  }
 
 void runLongCommand(char ch);
 
@@ -205,22 +212,48 @@ void runCalibrate(void) {
 }
 
 void runToPosion(int16_t position) {
-  DUMP_VAR(position);
-  int16_t currentPos = iPositionByHallCounter;
-  DUMP_VAR(currentPos);
+  if(position >= iPositionByHallRangeHigh ||position <= iPositionByHallRangeLow) {
+    return;
+  }
+  iTargetPositionByHall = position;
+  //DUMP_VAR(position);
+  int16_t currentPos = iPositionByHall;
+  //DUMP_VAR(currentPos);
   int16_t diff = position - currentPos;
-  DUMP_VAR(diff);
+  //DUMP_VAR(diff);
   iHallTurnRunStep = abs(diff);
-  DUMP_VAR(iHallTurnRunStep);
+  //DUMP_VAR(iHallTurnRunStep);
   if(iHallTurnRunStep > 0) {
     if(diff > 0) {
       CW();
     } else {
       CCW();
     }
-    analogWrite(PORT_PWM, 64);
+    uint32_t speed1 = iConstMaxSpeed;
+    uint32_t speed2 = iHallTurnRunStep;
+    uint32_t speed3 = iPositionByHallRangeDistance;
+    uint32_t speed32 = iConstMaxSpeed* iHallTurnRunStep/iPositionByHallRangeDistance;
+    uint8_t speed8 = speed32 & 0xff;
+    if(speed8 < iConstMinSpeed) {
+      speed8 = iConstMinSpeed;
+    }
+    iConstCurrentSpeed = speed8;
+    analogWrite(PORT_PWM, speed8);
     digitalWrite(PORT_BRAKE,HIGH);
   }
+}
+const static int8_t iConstTargetNear = 1;
+
+void caclTargetSpeed(void) {
+  if(iTargetPositionByHall == -1) {
+    return;
+  }
+  int8_t diff = abs(iTargetPositionByHall - iPositionByHall);
+  if(diff < iConstTargetNear ) {
+    iTargetPositionByHall = -1;
+    return;
+  }
+  runToPosion(iTargetPositionByHall);
 }
 
 void stopMotor(void) {
@@ -230,11 +263,7 @@ void stopMotor(void) {
 }
 void startMotor(void) {
   analogWrite(PORT_PWM, 32);
+  iConstCurrentSpeed = 32;
   digitalWrite(PORT_BRAKE,HIGH);
   iHallTurnRunStep = 6;
 }
-
-/*
-void verifyRunTime(void) {
-}
-*/
