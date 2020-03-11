@@ -58,16 +58,13 @@ const static int32_t iMainLoopPrintSkip = iMainLoopPrintA*iMainLoopPrintB;
 static long volatile iHallTurnRunStep = 0;
 static bool iBoolMotorCWFlag = false; //
 static const  int16_t iPositionByHallRangeLow = 50;
-static const  int16_t iPositionByHallRangeDistance = 163;
+static const  int16_t iPositionByHallRangeDistance = 152;
 static const  int16_t iPositionByHallRangeHigh = iPositionByHallRangeLow + iPositionByHallRangeDistance;
 static int16_t volatile iPositionByHall= -1;
 static uint8_t volatile iConstCurrentSpeed = 0;
 
 static bool iBoolRunCalibrate = false; //
 
-//const static uint8_t iConstMaxSpeed = 255;
-const static uint8_t iConstMaxSpeed = 64;
-const static uint8_t iConstMinSpeed = 16;
 
 
 
@@ -211,6 +208,11 @@ void runCalibrate(void) {
   startMotor();
 }
 
+//const static uint8_t iConstMaxSpeed = 255;
+const static uint8_t iConstMaxSpeed = 64;
+const static uint8_t iConstMinSpeed = 12;
+const static uint8_t iConstBrakeDistance = 32;
+
 void runToPosion(int16_t position) {
   if(position >= iPositionByHallRangeHigh ||position <= iPositionByHallRangeLow) {
     return;
@@ -232,11 +234,19 @@ void runToPosion(int16_t position) {
     uint32_t speed1 = iConstMaxSpeed;
     uint32_t speed2 = iHallTurnRunStep;
     uint32_t speed3 = iPositionByHallRangeDistance;
-    uint32_t speed32 = iConstMaxSpeed* iHallTurnRunStep/iPositionByHallRangeDistance;
+    uint32_t speed32 = iConstMaxSpeed * iHallTurnRunStep/iConstBrakeDistance;
+    if(speed32 > iConstMaxSpeed) {
+      speed32 = iConstMaxSpeed;
+    }
+    if(speed32 < iConstMinSpeed) {
+      speed32 = iConstMinSpeed;
+    }
     uint8_t speed8 = speed32 & 0xff;
+    /*
     if(speed8 < iConstMinSpeed) {
       speed8 = iConstMinSpeed;
     }
+    */
     iConstCurrentSpeed = speed8;
     analogWrite(PORT_PWM, speed8);
     digitalWrite(PORT_BRAKE,HIGH);
@@ -244,15 +254,19 @@ void runToPosion(int16_t position) {
 }
 const static int8_t iConstTargetNear = 1;
 
+static int8_t iTargetNearCounter = 0;
 void caclTargetSpeed(void) {
   if(iTargetPositionByHall == -1) {
     return;
   }
   int8_t diff = abs(iTargetPositionByHall - iPositionByHall);
-  if(diff < iConstTargetNear ) {
-    iTargetPositionByHall = -1;
+  if(diff <= iConstTargetNear ) {
+    if(iTargetNearCounter++ > 1) {
+      iTargetPositionByHall = -1;
+    }
     return;
   }
+  iTargetNearCounter = 0;
   runToPosion(iTargetPositionByHall);
 }
 

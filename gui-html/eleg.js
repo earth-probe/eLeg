@@ -53,11 +53,7 @@ const readSerailData = (reader)=> {
           onELegInfoLine(lineCmd);
         }
       }
-      if(readLineBuffer.length > 20) {
-        readLineBuffer.shift();
-      }
-      elemRead.textContent = readLineBuffer.join('\n');
-
+      elemRead.textContent = readLineBuffer.reverse().join('\n');
       const lastElem = buffParam[buffParam.length -1];
       //console.log('readSerailData::readOne lastElem=<',lastElem,'>');
       readBuffOneLine = lastElem;
@@ -113,7 +109,7 @@ const changeLowOfPos = (value) => {
   const minElem = document.getElementById('eleg-position-min');
   minElem.textContent = value;
   const rangeElem = document.getElementById('eleg-position-value-range');
-  rangeElem.setAttribute('min',value);
+  rangeElem.setAttribute('min',parseInt(value) + 1);
 }
 
 
@@ -121,7 +117,7 @@ const changeHighOfPos = (value) => {
   const maxElem = document.getElementById('eleg-position-max');
   maxElem.textContent = value;
   const rangeElem = document.getElementById('eleg-position-value-range');
-  rangeElem.setAttribute('max',value);
+  rangeElem.setAttribute('max',parseInt(value) -1);
 }
 
 const onClickCalibratePosition = (evt) => {
