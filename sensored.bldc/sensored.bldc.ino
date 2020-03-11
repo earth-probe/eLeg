@@ -138,8 +138,8 @@ bool verifyLimitSwitch(void) {
 void runLongCommand(char ch);
 
 void handleIncommingCommand(void) {
-  if (Serial.available() > 0) {
-    char incomingByte = Serial.read();
+  signed incomingByte = Serial.read();
+  if (incomingByte != -1) {
     if(incomingByte == 'z') {
       CW();
       digitalWrite(PORT_CW,HIGH);
